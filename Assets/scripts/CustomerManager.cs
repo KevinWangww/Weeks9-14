@@ -4,45 +4,73 @@ using UnityEngine;
 
 public class CustomerManager : MonoBehaviour
 {
-    public GameObject[] customerPrefabs; // 可生成的顾客预制体数组
-    public float spawnInterval = 2.0f;   // 生成顾客的间隔时间（秒）
+    public GameObject[] customerPrefabs;               // 顾客预制体数组（每种类型一个）
+    public float spawnInterval = 2.0f;                 // 每隔多少秒生成一个顾客
 
-    // 游戏开始时启动协程持续生成顾客
-    private void Start()
+    private ScoreManager scoreManager;                 // 分数系统引用（用于加分）
+    private ProductManager productManager;             // 商品系统引用（用于判断是否选对）
+    private List<Customer> activeCustomers = new List<Customer>();  // 当前在场顾客列表
+
+    // Unity生命周期函数，初始化并启动生成顾客协程
+    // 调用者：Unity引擎
+    void Start()
     {
+        scoreManager = FindObjectOfType<ScoreManager>();         // 获取 ScoreManager
+        productManager = FindObjectOfType<ProductManager>();     // 获取 ProductManager
         StartCoroutine(SpawnCustomers());
     }
 
-    // 协程：每隔 spawnInterval 秒生成一个顾客
-    // 使用者：自身 Start()
+    // 每隔一段时间生成一个顾客
+    // 调用者：Start() 协程
     IEnumerator SpawnCustomers()
     {
         while (true)
         {
-            SpawnCustomer();
+            GenerateCustomer();
             yield return new WaitForSeconds(spawnInterval);
         }
     }
 
-    // 随机选择一个顾客类型并生成到场景
-    // 使用者：SpawnCustomers()
-    void SpawnCustomer()
+    // 实际生成顾客的方法
+    // 调用者：SpawnCustomers()
+    void GenerateCustomer()
     {
         int index = Random.Range(0, customerPrefabs.Length);
-        int order = Random.Range(0, 3);
-        Vector2 position = GetRandomPosition();
-        GameObject customer = Instantiate(customerPrefabs[index], position, default);
-        customer.GetComponent<SpriteRenderer>().enabled = true;
+        Vector3 position = GetRandomPosition();
 
-        Customer customerScript = customer.GetComponent<Customer>();
-        customerScript.StartTimer(); // 启动该顾客的计时器（来自 Customer.cs）
+        GameObject customerObj = Instantiate(customerPrefabs[index], position, Quaternion.identity);
+        Customer customer = customerObj.GetComponent<Customer>();
+
+        customer.SetCustomerManager(this); // 顾客内部会保存引用
+        activeCustomers.Add(customer);
     }
 
-    // 为顾客生成一个随机位置（静止）
-    Vector2 GetRandomPosition()
+    // 由顾客调用（被点击时），统一判断是否选对商品
+    // 调用者：Customer.OnMouseDown()
+    public void OnCustomerClicked(Customer customer)
+    {
+        int selected = productManager.GetCurrentProduct();  // 当前玩家选择的商品
+        int order = customer.GetOrderType();                // 顾客的订单编号
+
+        if (selected == order)
+        {
+            Debug.Log("订单正确，加分");
+            scoreManager.AddScore(1);                       // 调用 ScoreManager
+            customer.MarkServed();                          // 顾客离开
+        }
+        else
+        {
+            Debug.Log("订单错误");
+        }
+
+        activeCustomers.Remove(customer);
+    }
+
+    // 顾客生成位置的随机函数
+    Vector3 GetRandomPosition()
     {
         float x = Random.Range(-4f, 4f);
         float y = Random.Range(-2f, 2f);
-        return new Vector2(x, y);
+        return new Vector3(x, y, 0);
     }
 }

@@ -2,46 +2,55 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.UI;
+
 
 // 顾客行为脚本
 // 功能：计时、处理玩家点击上菜、生成订单显示对象。
 // 使用者：CustomerManager.cs（调用 StartTimer）、玩家点击（OnMouseDown）
 [System.Serializable]
-public class BonusScoreEvent : UnityEvent<int> { }
-
+public class CustomerClickEvent : UnityEvent<Customer> { }
 public class Customer : MonoBehaviour
 {
-    public int orderType;                     // 顾客要求的商品编号
-    public UnityEvent onServeSuccess;         // 上菜成功事件（如加分）
-    public BonusScoreEvent onQuickServe;      // 快速上菜事件（<5秒加额外分）
+    public int orderType;                             // 顾客所点商品编号（0,1,2）
+    public GameObject orderDisplayPrefab;             // 显示订单用的UI预制体
 
-    public GameObject orderDisplayPrefab;     // 订单显示对象的预制体
-    private GameObject orderDisplayInstance;  // 订单显示对象实例
+    private GameObject orderDisplayInstance;          // 实例化出来的订单UI对象
+    private float timeElapsed = 0f;                   // 顾客已等待的时间
+    private bool served = false;                      // 顾客是否已被服务
 
-    public ProductManager productManager;
+    private CustomerManager customerManager;          // 顾客管理器，用于上报点击事件
 
-    private float timeElapsed = 0;            // 用于计时
-
-    // 启动计时器，并创建订单显示对象
-    // 使用者：CustomerManager.cs（在 SpawnCustomer 中调用）
-    public void StartTimer()
+    // Unity Start生命周期函数
+    // 在顾客生成后启动计时器并显示订单图标
+    // 调用：Unity引擎自动调用
+    void Start()
     {
-        orderType = Random.Range(0, 3); // 0 到 2
-
         StartCoroutine(WaitForTimeout());
         CreateOrderDisplay();
+
+        // 自动查找场景中的 CustomerManager（也可以手动拖入）
+        if (customerManager == null)
+        {
+            customerManager = FindObjectOfType<CustomerManager>();
+        }
     }
 
-    // 每帧计时，超过10秒未上菜则顾客离开
+    // 顾客等待协程：10秒未被服务就离开
+    // 调用：Start() 内部调用
     IEnumerator WaitForTimeout()
     {
-        while (timeElapsed < 10f)
+        while (timeElapsed < 10f && !served)
         {
             timeElapsed += Time.deltaTime;
             yield return null;
         }
-        Destroy(gameObject); // 超时销毁顾客
-        Debug.Log("顾客超时离开");
+
+        if (!served)
+        {
+            Destroy(gameObject); // 超时离开
+            Debug.Log("顾客超时离开");
+        }
     }
 
     // 在顾客上方生成订单显示对象，并显示对应图片
@@ -57,8 +66,6 @@ public class Customer : MonoBehaviour
         display.Initialize(transform.position, orderType);
     }
 
-    // 玩家点击顾客时触发上菜逻辑
-    // 使用者：Unity 引擎自动调用（OnMouseDown）
     private void Update()
     {
         // 当玩家点击左键
@@ -74,35 +81,46 @@ public class Customer : MonoBehaviour
             float clickRadius = 0.5f;
             if (distance < clickRadius)
             {
-                TryServe();
+                OnMouseDown();
             }
         }
     }
 
-    // 尝试上菜
-    private void TryServe()
+
+    void OnMouseDown()
     {
-        int currentProduct = productManager.GetCurrentProduct();
-
-        if (currentProduct == orderType)
+        if (!served && customerManager != null)
         {
-            onServeSuccess.Invoke(); // 正确上菜事件
-            if (timeElapsed < 5f)
-            {
-                onQuickServe.Invoke(1); // 快速上菜事件
-            }
-
-            Destroy(gameObject);
-            Debug.Log("成功上菜，订单：" + orderType);
-        }
-        else
-        {
-            Debug.Log("商品不匹配！");
+            // 向 CustomerManager 上报：我被点击了
+            customerManager.OnCustomerClicked(this); // 使用 CustomerManager 的方法
         }
     }
 
-    // 当顾客被销毁时销毁其订单显示对象
-    private void OnDestroy()
+
+    // 被 CustomerManager 调用，当顾客服务成功后执行销毁
+    // 调用者：CustomerManager
+    public void MarkServed()
+    {
+        served = true;
+        Destroy(gameObject); // 顾客离开
+    }
+
+    // 获取顾客当前的订单编号
+    // 调用者：CustomerManager
+    public int GetOrderType()
+    {
+        return orderType;
+    }
+
+    // 可选方法：外部在生成顾客后手动设置管理器引用
+    // 调用者：CustomerManager
+    public void SetCustomerManager(CustomerManager manager)
+    {
+        customerManager = manager;
+    }
+
+    // 顾客销毁时一并销毁订单图标
+    void OnDestroy()
     {
         if (orderDisplayInstance != null)
         {
