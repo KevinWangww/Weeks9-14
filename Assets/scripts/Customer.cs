@@ -50,6 +50,7 @@ public class Customer : MonoBehaviour
     {
         // 生成订单显示对象
         orderDisplayInstance = Instantiate(orderDisplayPrefab);
+        orderDisplayInstance.GetComponent<SpriteRenderer>().enabled = true;
 
         // 初始化位置和图片（传入顾客位置和订单编号）
         OrderDisplay display = orderDisplayInstance.GetComponent<OrderDisplay>();

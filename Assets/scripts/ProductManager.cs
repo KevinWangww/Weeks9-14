@@ -2,27 +2,21 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.UI;
 
 public class ProductManager : MonoBehaviour
 {
     public UnityEvent<int> onProductSwitch; // 商品切换事件（可供UI动画等扩展）
-
     private int currentProduct = 0;         // 当前选择商品编号
 
-    // 游戏开始时查找所有 ProductButton 并注册监听
     private void Start()
     {
-        ProductButton[] buttons = FindObjectsOfType<ProductButton>();
-        foreach (ProductButton button in buttons)
-        {
-            button.onProductSelected.AddListener(OnProductSelected); // 监听按钮点击
-        }
     }
 
     // 接收商品按钮点击事件并更新当前商品编号
     // 触发商品切换事件
     // 使用者：ProductButton.cs（按钮点击后触发）
-    void OnProductSelected(int productIndex)
+    public void OnProductSelected(int productIndex)
     {
         currentProduct = productIndex;
         onProductSwitch.Invoke(currentProduct);
