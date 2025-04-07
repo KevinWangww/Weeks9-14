@@ -4,22 +4,19 @@ using UnityEngine;
 
 public class OrderDisplay : MonoBehaviour
 {
-    public Sprite[] productSprites;         // 商品图片数组（对应编号）
-    private SpriteRenderer spriteRenderer;  // 渲染器用于显示图像
+    public Sprite[] productSprites;         // Array of product images (corresponding numbers)
+    private SpriteRenderer spriteRenderer;  // Renderer for displaying images
 
-    // 初始化订单显示
-    // 参数：
-    // position：顾客的位置（自动加偏移）
-    // productIndex：订单编号（商品类型）
+    // For displaying orders
+    // CustomerPosition is the customer's position, on top of which the order is displayed a bit higher up
+    // ProductIndex is the customer's order index.
     public void Initialize(Vector2 customerPosition, int productIndex)
     {
-        // 设置显示位置（顾客正上方）
+        // Setting the display position above the customer.
         transform.position = customerPosition + new Vector2(0, 3f);
 
-        // 获取 SpriteRenderer 组件
+        // Set the image to the corresponding product.
         spriteRenderer = GetComponent<SpriteRenderer>();
-
-        // 设置图像
         spriteRenderer.sprite = productSprites[productIndex];
         
     }

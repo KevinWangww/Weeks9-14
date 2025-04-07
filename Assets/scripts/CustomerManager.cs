@@ -4,73 +4,77 @@ using UnityEngine;
 
 public class CustomerManager : MonoBehaviour
 {
-    public GameObject[] customerPrefabs;               // 顾客预制体数组（每种类型一个）
-    public float spawnInterval = 2.0f;                 // 每隔多少秒生成一个顾客
+    public GameObject[] customerPrefabs;                       // Customer prefabs
+    public float spawnInterval = 2.0f;                         // Waiting time to spawn new customer
 
-    private ScoreManager scoreManager;                 // 分数系统引用（用于加分）
-    private ProductManager productManager;             // 商品系统引用（用于判断是否选对）
-    private List<Customer> activeCustomers = new List<Customer>();  // 当前在场顾客列表
+    private List<Customer> listeners = new List<Customer>();   // Customer listener list
+    public ScoreManager scoreManager;                          // Script that displays scores, use to invoke adding score when completing an order.
+    public ProductManager productManager;                      // Use to get the item currently selected by the player.
+    public CustomerManager customerManager;                    // itself, use to assign itself to the new generated customer.
 
-    // Unity生命周期函数，初始化并启动生成顾客协程
-    // 调用者：Unity引擎
     void Start()
     {
-        scoreManager = FindObjectOfType<ScoreManager>();         // 获取 ScoreManager
-        productManager = FindObjectOfType<ProductManager>();     // 获取 ProductManager
-        StartCoroutine(SpawnCustomers());
+        StartCoroutine(SpawnCustomers()); // Start spawning customers
+        customerManager = GetComponent<CustomerManager>(); 
     }
 
-    // 每隔一段时间生成一个顾客
-    // 调用者：Start() 协程
-    IEnumerator SpawnCustomers()
+    IEnumerator SpawnCustomers() // Generate customer coroutine
     {
         while (true)
         {
-            GenerateCustomer();
-            yield return new WaitForSeconds(spawnInterval);
+            SpawnCustomer();
+            yield return new WaitForSeconds(spawnInterval); // Wait sometime and continue
         }
     }
 
-    // 实际生成顾客的方法
-    // 调用者：SpawnCustomers()
-    void GenerateCustomer()
+    void SpawnCustomer() // Spawn a customer
     {
-        int index = Random.Range(0, customerPrefabs.Length);
-        Vector3 position = GetRandomPosition();
+        int index = Random.Range(0, customerPrefabs.Length);                                 // Randomly pick a customer's prefab
 
-        GameObject customerObj = Instantiate(customerPrefabs[index], position, Quaternion.identity);
-        Customer customer = customerObj.GetComponent<Customer>();
+        float x = Random.Range(-4f, 4f);
+        float y = Random.Range(-1f, 1f);
+        Vector2 position = new Vector2(x, y);                                                // Get a random location
 
-        customer.SetCustomerManager(this); // 顾客内部会保存引用
-        activeCustomers.Add(customer);
+        GameObject obj = Instantiate(customerPrefabs[index], position, Quaternion.identity); // Instantiate a new customer
+        Customer customer = obj.GetComponent<Customer>();                                    // Find the script for this customer
+
+        customer.SetCustomerManager(customerManager);                                        // Transfers itself to this new customer so that the customer can invoke the methods of the script.
+        listeners.Add(customer);                                                             // Adding a customer to the listener list
     }
 
-    // 由顾客调用（被点击时），统一判断是否选对商品
-    // 调用者：Customer.OnMouseDown()
-    public void OnCustomerClicked(Customer customer)
+    // Called when a customer is clicked, it determines whether it is correct and returns whether the service was successful.
+    public bool NotifyCustomerClicked(Customer customer)
     {
-        int selected = productManager.GetCurrentProduct();  // 当前玩家选择的商品
-        int order = customer.GetOrderType();                // 顾客的订单编号
+        // Check if it is in the list of listeners.
+        // Used to avoid a situation where a customer continues to be clicked after being removed from the listener.
+        if (!listeners.Contains(customer))
+        {
+            return false;
+        }
 
+        int selected = productManager.GetCurrentProduct();    // See which item is now selected by the player.
+        int order = customer.GetOrderType();                  // Get the items ordered by the customer.
+
+        float elapsed = customer.GetElapsedTime();            // Getting the waiting time
+
+        // If the selection matches the order.
         if (selected == order)
         {
-            Debug.Log("订单正确，加分");
-            scoreManager.AddScore(1);                       // 调用 ScoreManager
-            customer.MarkServed();                          // 顾客离开
-        }
-        else
-        {
-            Debug.Log("订单错误");
+            if (elapsed < 2f)         // If the time is within 2 seconds
+            {
+                scoreManager.AddScore(1);
+            }
+            scoreManager.AddScore(1); // Add 1 score
         }
 
-        activeCustomers.Remove(customer);
+        // Removes the customer from the list of listeners and returns the result.
+        listeners.Remove(customer);
+        return (selected == order); 
     }
 
-    // 顾客生成位置的随机函数
-    Vector3 GetRandomPosition()
+    // Used to remove yourself from the listener when the wait time has expired, called by the customer.
+    public void RemoveCustomerFromListeners(Customer customer)
     {
-        float x = Random.Range(-4f, 4f);
-        float y = Random.Range(-2f, 2f);
-        return new Vector3(x, y, 0);
+        listeners.Remove(customer);
     }
 }

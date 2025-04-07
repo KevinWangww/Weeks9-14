@@ -5,126 +5,123 @@ using UnityEngine.Events;
 using UnityEngine.UI;
 
 
-// 顾客行为脚本
-// 功能：计时、处理玩家点击上菜、生成订单显示对象。
-// 使用者：CustomerManager.cs（调用 StartTimer）、玩家点击（OnMouseDown）
-[System.Serializable]
-public class CustomerClickEvent : UnityEvent<Customer> { }
+// The script is responsible for timing, handling player clicks, and generating order display objects.
 public class Customer : MonoBehaviour
 {
-    public int orderType;                             // 顾客所点商品编号（0,1,2）
-    public GameObject orderDisplayPrefab;             // 显示订单用的UI预制体
+    public int orderType;                             // Customer's order index number
+    public GameObject orderDisplayPrefab;             // The preform use to showing order icons
 
-    private GameObject orderDisplayInstance;          // 实例化出来的订单UI对象
-    private float timeElapsed = 0f;                   // 顾客已等待的时间
-    private bool served = false;                      // 顾客是否已被服务
+    private GameObject orderDisplayInstance;          // This customer's product display object
+    private float timeElapsed = 0f;                   // Customer waiting time
 
-    private CustomerManager customerManager;          // 顾客管理器，用于上报点击事件
-
-    // Unity Start生命周期函数
-    // 在顾客生成后启动计时器并显示订单图标
-    // 调用：Unity引擎自动调用
+    private CustomerManager customerManager;          // Reference to CustomerManager for report on clicks
+    public Customer customer;                         // Use to store itself
     void Start()
     {
-        StartCoroutine(WaitForTimeout());
-        CreateOrderDisplay();
+        orderType = Random.Range(0, 3);               // Random order numbers from 0 to 2
 
-        // 自动查找场景中的 CustomerManager（也可以手动拖入）
-        if (customerManager == null)
-        {
-            customerManager = FindObjectOfType<CustomerManager>();
-        }
+        StartCoroutine(WaitForTimeout());             // Start calculating wait time
+        CreateOrderDisplay();                         // Display The order
+
+        customer = GetComponent<Customer>();          // Get your own customer component
     }
 
-    // 顾客等待协程：10秒未被服务就离开
-    // 调用：Start() 内部调用
+    // Use to allow manager to send itself to a new customer prefab as soon as it is generated.
+    public void SetCustomerManager(CustomerManager manager)
+    {
+        customerManager = manager; // Assignment to local variable
+    }
+
+    // Timer, customers leave when time expires
     IEnumerator WaitForTimeout()
     {
-        while (timeElapsed < 10f && !served)
+        while (timeElapsed < 8f)
         {
             timeElapsed += Time.deltaTime;
             yield return null;
         }
-
-        if (!served)
-        {
-            Destroy(gameObject); // 超时离开
-            Debug.Log("顾客超时离开");
-        }
+        
+        customerManager.RemoveCustomerFromListeners(this);  // Calling the Remove Listener method in Manager
+        StartCoroutine(ShrinkAndDestroy());                 // Make the customer object smaller and then destroy it
     }
 
-    // 在顾客上方生成订单显示对象，并显示对应图片
-    // 使用者：StartTimer()
+    // An animation of the object gradually shrinking and then destroying the
+    IEnumerator ShrinkAndDestroy()
+    {
+        float i = 1f;
+        float process = 0f;
+        Vector3 originalScale = transform.localScale;
+
+        // Progress is not yet complete.
+        while (process < i)
+        {
+            float t = process / i;
+            transform.localScale = Vector3.Lerp(originalScale, Vector3.zero, t);
+            process += Time.deltaTime;
+            yield return null;
+        }
+
+        Destroy(gameObject); // Destroy the object
+    }
+
+    // Generate an order display object above the customer and display the corresponding picture
     private void CreateOrderDisplay()
     {
-        // 生成订单显示对象
+        // Generate order display object
         orderDisplayInstance = Instantiate(orderDisplayPrefab);
-        orderDisplayInstance.GetComponent<SpriteRenderer>().enabled = true;
 
-        // 初始化位置和图片（传入顾客位置和订单编号）
+        // Import customer location and order number
         OrderDisplay display = orderDisplayInstance.GetComponent<OrderDisplay>();
         display.Initialize(transform.position, orderType);
     }
 
+    // Trigger serving logic when player clicks on customer
+    // Determine whether a customer has been clicked by calculating the distance from the customer object at the time of the mouse click.
     private void Update()
     {
-        // 当玩家点击左键
         if (Input.GetMouseButtonDown(0))
         {
-            // 获取鼠标点击在世界空间中的位置（z = 0 用于2D）
+            // Get the position of the mouse click in world space
             Vector2 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
-            // 计算鼠标与顾客的距离
+            // Calculate the distance between the mouse and the customer
             float distance = Vector2.Distance(mouseWorldPos, transform.position);
 
-            // 如果在点击半径范围内，视为选中顾客
-            float clickRadius = 0.5f;
+            // Customer is considered to be selected if they are within the click radius.
+            float clickRadius = 1f;
             if (distance < clickRadius)
             {
-                OnMouseDown();
+                // Handle clicks in a unified way through the Manager and return the results
+                bool success = customerManager.NotifyCustomerClicked(customer);
+
+                if (success)
+                {
+                    
+                    Destroy(gameObject);
+                }
+                else
+                {
+                    Debug.Log("product error");
+                }
             }
         }
     }
 
-
-    void OnMouseDown()
-    {
-        if (!served && customerManager != null)
-        {
-            // 向 CustomerManager 上报：我被点击了
-            customerManager.OnCustomerClicked(this); // 使用 CustomerManager 的方法
-        }
-    }
-
-
-    // 被 CustomerManager 调用，当顾客服务成功后执行销毁
-    // 调用者：CustomerManager
-    public void MarkServed()
-    {
-        served = true;
-        Destroy(gameObject); // 顾客离开
-    }
-
-    // 获取顾客当前的订单编号
-    // 调用者：CustomerManager
+    // Returns the customer's order to the customer manager
     public int GetOrderType()
     {
         return orderType;
     }
 
-    // 可选方法：外部在生成顾客后手动设置管理器引用
-    // 调用者：CustomerManager
-    public void SetCustomerManager(CustomerManager manager)
+    // Provide wait time to external (used to determine if the order is completed quickly)
+    public float GetElapsedTime()
     {
-        customerManager = manager;
+        return timeElapsed;
     }
 
-    // 顾客销毁时一并销毁订单图标
+    // Objects dedicated to deleting display orders
     void OnDestroy()
     {
-        if (orderDisplayInstance != null)
-        {
-            Destroy(orderDisplayInstance);
-        }
+        Destroy(orderDisplayInstance);
     }
 }

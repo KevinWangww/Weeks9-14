@@ -6,19 +6,27 @@ using UnityEngine.UI;
 
 public class ProductManager : MonoBehaviour
 {
-    private int currentProduct = 0;         // 当前选择商品编号
+    public List<Button> productButtons = new List<Button>();  // Button list
 
-    // 接收商品按钮点击事件并更新当前商品编号
-    // 触发商品切换事件
-    // 使用者：ProductButton.cs（按钮点击后触发）
-    public void OnProductSelected(int productIndex)
+    private int currentProduct = 0;                           // Currently selected item number
+
+    void Start()
     {
-        currentProduct = productIndex;
-        Debug.Log("当前选择商品：" + currentProduct);
+        // Add listener to each button (using the index as the item number)
+        for (int i = 0; i < productButtons.Count; i++)
+        {
+            int index = i;
+            productButtons[index].onClick.AddListener(() => OnProductButtonClicked(index)); // Buttons add listener
+        }
     }
 
-    // 提供当前商品编号
-    // 使用者：Customer.cs（点击顾客时判断是否选对商品）
+    // Call when the button is clicked, updating the current item number
+    public void OnProductButtonClicked(int index)
+    {
+        currentProduct = index;
+    }
+
+    // Provide the current item number to the CustomerManager.
     public int GetCurrentProduct()
     {
         return currentProduct;

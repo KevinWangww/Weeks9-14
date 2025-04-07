@@ -9,13 +9,15 @@ public class ScoreManager : MonoBehaviour
     public Text scoreText;
     private int score = 0;
 
+    // Call and add points when the order is completed.
     public void AddScore(int value)
     {
         score += value;
         UpdateScoreText();
-        Debug.Log("得分增加：" + value);
+        
     }
 
+    // Show scores on screen
     void UpdateScoreText()
     {
         if (scoreText != null)
